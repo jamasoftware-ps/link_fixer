@@ -105,12 +105,26 @@ def get_project_id():
         sys.exit()
 
 
+def get_log_file_count():
+    if 'PARAMETERS' in config:
+        if 'log file count' in config['PARAMETERS']:
+            return int(config['PARAMETERS']['log file count'])
+    return 1000
+
+
 def init_logger():
     # Setup logging
     try:
         os.makedirs('logs')
     except FileExistsError:
         pass
+
+    # lets do some memory management here
+    if len(os.listdir('logs/')) > get_log_file_count():
+        log_file_list = os.listdir('logs/')
+        log_file_list.sort()
+        os.remove('logs/' + log_file_list[0])
+        print(str(log_file_list))
 
     current_date_time = datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')
     log_file = 'logs/' + str(current_date_time) + '.log'
