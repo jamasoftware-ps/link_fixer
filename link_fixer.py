@@ -124,6 +124,32 @@ def init_logger():
     return logger
 
 
+def get_synced_item(item_id, project_id):
+    old_item = client.get_item(item_id)
+    synced_items = client.get_items_synceditems(item_id)
+    valid_synced_items = []
+
+    if old_item is None or old_item is {}:
+        logger.error('Unable to find original item ID:[' + item_id + ']')
+        return None
+
+    if synced_items is None or len(synced_items) is 0:
+        logger.error('Unable to find new synced items for original item with ID:[' + item_id + ']')
+
+    for synced_item in synced_items:
+        if synced_item['project'] is project_id:
+            valid_synced_items.append(synced_item['id'])
+
+    # 🤞 only should have one valid synced item here
+    if len(valid_synced_items) is 1:
+        return valid_synced_items[0]
+    elif len(valid_synced_items) > 1:
+        logger.error('Multiple synced items found item with ID:[' + item_id + ']')
+
+    # else report some errors here
+    logger.error('Unable to find new synced item location for item: [' + item_id + ']')
+    return None
+
 # link fixer script, will identify broken links from old projects, and correct the links
 # a link to the past
 if __name__ == '__main__':
@@ -199,10 +225,7 @@ if __name__ == '__main__':
                     continue
 
                 linked_project_id = urlparse.parse_qs(parsed_link.query)['projectId'][0]
-
-                # is this a link to a valid project?
-                if int(linked_project_id) in valid_project_ids:
-                    continue
+                linked_item_id = urlparse.parse_qs(parsed_link.query)['docId'][0]
 
                 # does this project id param not match the current project?
                 # if so then this is a bad link
@@ -211,7 +234,13 @@ if __name__ == '__main__':
                 if int(linked_project_id) != int(project_id):
                     bad_link_found = True
                     bad_link_count += 1
-                    value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
+
+                    # we will need to get the new item id here
+                    corrected_item_id = get_synced_item(linked_item_id, project_id)
+
+                    if corrected_item_id is not None:
+                        value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
+                        value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
 
             # we have a bad link for this item?
             if bad_link_found:
