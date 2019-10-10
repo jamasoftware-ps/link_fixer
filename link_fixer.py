@@ -105,26 +105,12 @@ def get_project_id():
         sys.exit()
 
 
-def get_log_file_count():
-    if 'PARAMETERS' in config:
-        if 'log file count' in config['PARAMETERS']:
-            return int(config['PARAMETERS']['log file count'])
-    return 1000
-
-
 def init_logger():
     # Setup logging
     try:
         os.makedirs('logs')
     except FileExistsError:
         pass
-
-    # lets do some memory management here
-    if len(os.listdir('logs/')) > get_log_file_count():
-        log_file_list = os.listdir('logs/')
-        log_file_list.sort()
-        os.remove('logs/' + log_file_list[0])
-        print(str(log_file_list))
 
     current_date_time = datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')
     log_file = 'logs/' + str(current_date_time) + '.log'
@@ -276,43 +262,47 @@ if __name__ == '__main__':
     STEP THREE - fix and log all the things
     """
     # use a progress bar here. this can be a very long running process
-    with ChargingBar('Correcting broken links ', max=len(broken_link_map), suffix='%(percent).1f%% - %(eta)ds') as bar:
-        # iterate over the map, and do work
-        for item_id, broken_links in broken_link_map.items():
+    if len(broken_link_map) > 0:
+        with ChargingBar('Correcting broken links ', max=len(broken_link_map), suffix='%(percent).1f%% - %(eta)ds') as bar:
+            # iterate over the map, and do work
+            for item_id, broken_links in broken_link_map.items():
 
-            patch_list = []
-            changed_list = []
+                patch_list = []
+                changed_list = []
 
-            logger.info('Found broken link(s) on item ID: [' + str(item_id) + ']')
+                logger.info('Found broken link(s) on item ID: [' + str(item_id) + ']')
 
-            for b in broken_links:
-                # log out the old and new rich text values.
-                logger_old_value = b.get('oldValue').replace('\n', '\n\t')
-                logger_new_value = b.get('newValue').replace('\n', '\n\t')
-                logger.info('Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
-                logger.info('old rich text:\n\t' + logger_old_value)
-                logger.info('new rich text:\n\t' + logger_new_value)
+                for b in broken_links:
+                    # log out the old and new rich text values.
+                    logger_old_value = b.get('oldValue').replace('\n', '\n\t')
+                    logger_new_value = b.get('newValue').replace('\n', '\n\t')
+                    logger.info('Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
+                    logger.info('old rich text:\n\t' + logger_old_value)
+                    logger.info('new rich text:\n\t' + logger_new_value)
 
-                payload = {
-                    'op': 'replace',
-                    'path': '/fields/' + b.get('fieldName'),
-                    'value': b.get('newValue')
-                }
-                patch_list.append(payload)
+                    payload = {
+                        'op': 'replace',
+                        'path': '/fields/' + b.get('fieldName'),
+                        'value': b.get('newValue')
+                    }
+                    patch_list.append(payload)
 
-            # lets try and patch this data
-            try:
-                client.patch_item(item_id, patch_list)
-                logger.info('Successfully patched item [' + str(item_id) + ']')
 
-            except APIException as error:
-                # we goofed this. 🤷‍
-                logger.error('Failed to patched item [' + str(item_id) + ']')
-                logger.error('API exception response: ' + str(error))
+                # lets try and patch this data
+                try:
+                    client.patch_item(item_id, patch_list)
+                    logger.info('Successfully patched item [' + str(item_id) + ']')
 
-            bar.next()
-        bar.finish()
-        print('fixed ' + str(len(broken_link_map)) + ' attachments')
+                except APIException as error:
+                    # we goofed this. 🤷‍
+                    logger.error('Failed to patched item [' + str(item_id) + ']')
+                    logger.error('API exception response: ' + str(error))
+
+                bar.next()
+            bar.finish()
+            print('fixed ' + str(len(broken_link_map)) + ' attachments')
+    else:
+        logger.info('There are zero links to be corrected, exiting...')
 
     # were done here 🎉🎉🎉
     elapsed_time = '%.2f' % (time.time() - start_time)
