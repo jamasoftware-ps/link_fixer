@@ -2,18 +2,17 @@ import configparser
 import datetime
 import getpass
 import logging
-import json
 import os
 import sys
 import time
-
-from bs4 import BeautifulSoup
 import urllib.parse as urlparse
 
+from bs4 import BeautifulSoup
 from halo import Halo
 from progress.bar import ChargingBar
 
 from py_jama_rest_client.client import JamaClient, APIException
+
 
 def init_jama_client():
     # do we have credentials in the config?
@@ -238,9 +237,19 @@ if __name__ == '__main__':
                     # we will need to get the new item id here
                     corrected_item_id = get_synced_item(linked_item_id, project_id)
 
+                    # do we have a corrected item id? lets correct the link wiht that data!
                     if corrected_item_id is not None:
-                        value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
-                        value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
+                        # replace the project id
+                        if '?projectId=' in value:
+                            value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
+                        elif ';projectId=' in value:
+                            value = value.replace(';projectId=' + str(linked_project_id), ';projectId=' + str(project_id))
+
+                        # replace the document id
+                        if '?docId=' in value:
+                            value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
+                        elif ';docId=' in value:
+                            value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
 
             # we have a bad link for this item?
             if bad_link_found:
