@@ -123,6 +123,15 @@ def init_logger():
     return logger
 
 
+def get_item_name(item_id):
+    try:
+        item = client.get_item(item_id)
+        return item['fields']['name']
+    except APIException as e:
+        logger.error('Unable to retrieve name data on item [' + item_id + ']  with exception:' + str(e.reason))
+        return None
+
+
 def get_synced_item(item_id, project_id):
     old_item = client.get_item(item_id)
     synced_items = client.get_items_synceditems(item_id)
@@ -237,6 +246,21 @@ if __name__ == '__main__':
                     # we will need to get the new item id here
                     corrected_item_id = get_synced_item(linked_item_id, project_id)
 
+                    # grab the correct item name, we will need this get the new name
+                    corrected_item_name = get_item_name(corrected_item_id)
+
+                    # lets do the work to change the links name to match the new correct item name
+                    if corrected_item_name is not None:
+                        hyperlink_old_name = hyperlink.text
+                        hyperlink_string = str(hyperlink)
+                        # only proceed with the name swap if we can get an exact match here
+                        if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
+                            corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>', corrected_item_name + '</a>')
+                            # if we have made it this far then lets go ahead and replace the hyperlink
+                            value = value.replace(hyperlink_string, corrected_hyperlink_string)
+                        else:
+                            logger.error('unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(corrected_item_name))
+
                     # do we have a corrected item id? lets correct the link wiht that data!
                     if corrected_item_id is not None:
                         # replace the project id
@@ -244,7 +268,6 @@ if __name__ == '__main__':
                             value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
                         elif ';projectId=' in value:
                             value = value.replace(';projectId=' + str(linked_project_id), ';projectId=' + str(project_id))
-
                         # replace the document id
                         if '?docId=' in value:
                             value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
