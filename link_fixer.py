@@ -128,7 +128,11 @@ def get_item_name(item_id):
         item = client.get_item(item_id)
         return item['fields']['name']
     except APIException as e:
-        logger.error('Unable to retrieve name data on item [' + item_id + ']  with exception:' + str(e.reason))
+        if e.reason is None:
+            logger.error('Unable to retrieve name data on item [' + item_id + ']  with exception:' + str(e.reason))
+        else:
+            logger.error('Unable to retrieve name data on item [' + item_id + ']')
+
         return None
 
 
