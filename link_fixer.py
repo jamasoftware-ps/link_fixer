@@ -162,6 +162,7 @@ def get_synced_item(item_id, project_id):
     logger.error('Unable to find new synced item location for item: [' + item_id + ']')
     return None
 
+
 # link fixer script, will identify broken links from old projects, and correct the links
 # a link to the past
 if __name__ == '__main__':
@@ -233,7 +234,7 @@ if __name__ == '__main__':
                 parsed_link = urlparse.urlparse(href)
 
                 # we only want to process jama links. lets skip over all the other links
-                if parsed_link.hostname not in instance_url:
+                if parsed_link.hostname is None or parsed_link.hostname not in instance_url:
                     continue
 
                 linked_project_id = urlparse.parse_qs(parsed_link.query)['projectId'][0]
@@ -251,7 +252,10 @@ if __name__ == '__main__':
                     corrected_item_id = get_synced_item(linked_item_id, project_id)
 
                     # grab the correct item name, we will need this get the new name
-                    corrected_item_name = get_item_name(corrected_item_id)
+                    if corrected_item_id is not None:
+                        corrected_item_name = get_item_name(corrected_item_id)
+                    else:
+                        corrected_item_name = None
 
                     # lets do the work to change the links name to match the new correct item name
                     if corrected_item_name is not None:
@@ -259,19 +263,24 @@ if __name__ == '__main__':
                         hyperlink_string = str(hyperlink)
                         # only proceed with the name swap if we can get an exact match here
                         if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
-                            corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>', corrected_item_name + '</a>')
+                            corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>',
+                                                                                  corrected_item_name + '</a>')
                             # if we have made it this far then lets go ahead and replace the hyperlink
                             value = value.replace(hyperlink_string, corrected_hyperlink_string)
                         else:
-                            logger.error('unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(corrected_item_name))
+                            logger.error(
+                                'unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(
+                                    corrected_item_name))
 
                     # do we have a corrected item id? lets correct the link wiht that data!
                     if corrected_item_id is not None:
                         # replace the project id
                         if '?projectId=' in value:
-                            value = value.replace('?projectId=' + str(linked_project_id), '?projectId=' + str(project_id))
+                            value = value.replace('?projectId=' + str(linked_project_id),
+                                                  '?projectId=' + str(project_id))
                         elif ';projectId=' in value:
-                            value = value.replace(';projectId=' + str(linked_project_id), ';projectId=' + str(project_id))
+                            value = value.replace(';projectId=' + str(linked_project_id),
+                                                  ';projectId=' + str(project_id))
                         # replace the document id
                         if '?docId=' in value:
                             value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
@@ -299,7 +308,8 @@ if __name__ == '__main__':
     """
     # use a progress bar here. this can be a very long running process
     if len(broken_link_map) > 0:
-        with ChargingBar('Correcting broken links ', max=len(broken_link_map), suffix='%(percent).1f%% - %(eta)ds') as bar:
+        with ChargingBar('Correcting broken links ', max=len(broken_link_map),
+                         suffix='%(percent).1f%% - %(eta)ds') as bar:
             # iterate over the map, and do work
             for item_id, broken_links in broken_link_map.items():
 
@@ -312,7 +322,8 @@ if __name__ == '__main__':
                     # log out the old and new rich text values.
                     logger_old_value = b.get('oldValue').replace('\n', '\n\t')
                     logger_new_value = b.get('newValue').replace('\n', '\n\t')
-                    logger.info('Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
+                    logger.info(
+                        'Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
                     logger.info('old rich text:\n\t' + logger_old_value)
                     logger.info('new rich text:\n\t' + logger_new_value)
 
@@ -322,7 +333,6 @@ if __name__ == '__main__':
                         'value': b.get('newValue')
                     }
                     patch_list.append(payload)
-
 
                 # lets try and patch this data
                 try:
