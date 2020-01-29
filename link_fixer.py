@@ -126,7 +126,7 @@ def init_logger():
 def get_item_name(item_id):
     try:
         item = client.get_item(item_id)
-        return item['fields']['name']
+        return item['fields']['documentKey']
     except APIException as e:
         if e.reason is None:
             logger.error('Unable to retrieve name data on item [' + item_id + ']  with exception:' + str(e.reason))
@@ -137,30 +137,30 @@ def get_item_name(item_id):
 
 
 def get_synced_item(item_id, project_id):
-    old_item = client.get_item(item_id)
-    synced_items = client.get_items_synceditems(item_id)
-    valid_synced_items = []
-
-    if old_item is None or old_item is {}:
-        logger.error('Unable to find original item ID:[' + item_id + ']')
+    try:
+        synced_items = client.get_items_synceditems(item_id)
+    except APIException as e:
+        logger.error('Unable to retrieve synced items for item id:[' + str(item_id) + ']. Exception: ' + str(e))
         return None
 
     if synced_items is None or len(synced_items) is 0:
-        logger.error('Unable to find new synced items for original item with ID:[' + item_id + ']')
+        logger.error('Unable to find any synced items for original item with ID:[' + item_id + ']')
+        return None
+
+    valid_synced_items = []
 
     for synced_item in synced_items:
         if synced_item['project'] is project_id:
             valid_synced_items.append(synced_item['id'])
 
-    # 🤞 only should have one valid synced item here
+    # only should have one valid synced item here
     if len(valid_synced_items) is 1:
         return valid_synced_items[0]
     elif len(valid_synced_items) > 1:
         logger.error('Multiple synced items found item with ID:[' + item_id + ']')
-
-    # else report some errors here
-    logger.error('Unable to find new synced item location for item: [' + item_id + ']')
-    return None
+        return None
+    else:
+        return None
 
 
 # link fixer script, will identify broken links from old projects, and correct the links
@@ -228,8 +228,14 @@ if __name__ == '__main__':
             bad_link_found = False
             bad_link_count = 0
 
+            if len(hyperlinks) > 0:
+                logger.info('\nProcessing ' + str(len(hyperlinks)) + ' hyperlinks on item ID:[' + str(item_id) + '] on field name:[' + str(key) + ']')
+
+            counter = 0
+
             # iterate over all the hyperlinks
             for hyperlink in hyperlinks:
+                counter += 1
                 href = hyperlink.get('href')
                 parsed_link = urlparse.urlparse(href)
 
@@ -240,52 +246,68 @@ if __name__ == '__main__':
                 linked_project_id = urlparse.parse_qs(parsed_link.query)['projectId'][0]
                 linked_item_id = urlparse.parse_qs(parsed_link.query)['docId'][0]
 
-                # does this project id param not match the current project?
+                logger.info('--- link ' + str(counter) + ' --- Processing link with item ID:[' + str(linked_item_id) + '] and project ID:[' + str(linked_project_id) + ']...')
+
+                try:
+                    original_item = client.get_item(item_id)
+                except APIException as e:
+                    logger.error('Unable to get original data on item ID:[' + str(item_id) + ']. Exception: ' + str(e))
+
+                # lets see if there is a synced item for this link
+                corrected_item_id = get_synced_item(linked_item_id, project_id)
+
+                if int(linked_project_id) == int(project_id) and original_item is not None:
+                    logger.info("valid link detected. skipping.")
+                    continue
+                elif original_item is None or original_item is {}:
+                    logger.error('Unable to find original item ID:[' + item_id + ']')
+                    continue
+                elif corrected_item_id is None:
+                    logger.error('Unable to find synced item, skipping link')
+                    continue
+
+                # we must have a single item id before continuing here.
+                # also does this project id param not match the current project?
                 # if so then this is a bad link
                 # there could potentially be more than one bad link per field value. so
                 # lets keep track of that.
-                if int(linked_project_id) != int(project_id):
-                    bad_link_found = True
-                    bad_link_count += 1
+                logger.info('Identified correct link, will change to now point to item ID:[' + str(corrected_item_id) + ']')
 
-                    # we will need to get the new item id here
-                    corrected_item_id = get_synced_item(linked_item_id, project_id)
+                bad_link_found = True
+                bad_link_count += 1
 
-                    # grab the correct item name, we will need this get the new name
-                    if corrected_item_id is not None:
-                        corrected_item_name = get_item_name(corrected_item_id)
+                # grab the correct item name, we will need this get the new name
+                corrected_item_name = get_item_name(corrected_item_id)
+
+                # lets do the work to change the links name to match the new correct item name
+                if corrected_item_name is not None:
+                    hyperlink_old_name = hyperlink.text
+                    hyperlink_string = str(hyperlink)
+                    # only proceed with the name swap if we can get an exact match here
+                    if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
+                        corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>',
+                                                                              corrected_item_name + '</a>')
+                        # if we have made it this far then lets go ahead and replace the hyperlink
+                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
                     else:
-                        corrected_item_name = None
+                        logger.error(
+                            'unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(
+                                corrected_item_name))
 
-                    # lets do the work to change the links name to match the new correct item name
-                    if corrected_item_name is not None:
-                        hyperlink_old_name = hyperlink.text
-                        hyperlink_string = str(hyperlink)
-                        # only proceed with the name swap if we can get an exact match here
-                        if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
-                            corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>',
-                                                                                  corrected_item_name + '</a>')
-                            # if we have made it this far then lets go ahead and replace the hyperlink
-                            value = value.replace(hyperlink_string, corrected_hyperlink_string)
-                        else:
-                            logger.error(
-                                'unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(
-                                    corrected_item_name))
-
-                    # do we have a corrected item id? lets correct the link wiht that data!
-                    if corrected_item_id is not None:
-                        # replace the project id
-                        if '?projectId=' in value:
-                            value = value.replace('?projectId=' + str(linked_project_id),
-                                                  '?projectId=' + str(project_id))
-                        elif ';projectId=' in value:
-                            value = value.replace(';projectId=' + str(linked_project_id),
-                                                  ';projectId=' + str(project_id))
-                        # replace the document id
-                        if '?docId=' in value:
-                            value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
-                        elif ';docId=' in value:
-                            value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
+                # do we have a corrected item id? lets correct the link wiht that data!
+                if corrected_item_id is not None:
+                    # replace the project id
+                    if '?projectId=' in value:
+                        value = value.replace('?projectId=' + str(linked_project_id),
+                                              '?projectId=' + str(project_id))
+                    elif ';projectId=' in value:
+                        value = value.replace(';projectId=' + str(linked_project_id),
+                                              ';projectId=' + str(project_id))
+                    # replace the document id
+                    if '?docId=' in value:
+                        value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
+                    elif ';docId=' in value:
+                        value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
 
             # we have a bad link for this item?
             if bad_link_found:
@@ -304,7 +326,7 @@ if __name__ == '__main__':
                 broken_link_map[item_id] = broken_list
 
     """
-    STEP THREE - fix and log all the things
+    STEP THREE - fix and log all broken hyperlinks
     """
     # use a progress bar here. this can be a very long running process
     if len(broken_link_map) > 0:
@@ -340,7 +362,7 @@ if __name__ == '__main__':
                     logger.info('Successfully patched item [' + str(item_id) + ']')
 
                 except APIException as error:
-                    # we goofed this. 🤷‍
+                    # failed to patch
                     logger.error('Failed to patched item [' + str(item_id) + ']')
                     logger.error('API exception response: ' + str(error))
 
@@ -350,6 +372,6 @@ if __name__ == '__main__':
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
-    # were done here 🎉🎉🎉
+    # were done here
     elapsed_time = '%.2f' % (time.time() - start_time)
     print('total execution time: ' + elapsed_time + ' seconds')
