@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import time
+import warnings
 import urllib.parse as urlparse
 
 from bs4 import BeautifulSoup
@@ -166,6 +167,7 @@ def get_synced_item(item_id, project_id):
 # link fixer script, will identify broken links from old projects, and correct the links
 # a link to the past
 if __name__ == '__main__':
+    warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
     # int some logging ish
     logger = init_logger()
     start_time = time.time()
@@ -287,6 +289,12 @@ if __name__ == '__main__':
                     if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
                         corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>',
                                                                               corrected_item_name + '</a>')
+                        corrected_hyperlink_string = corrected_hyperlink_string.replace(
+                            'projectId=' + str(linked_project_id),
+                            'projectId=' + str(project_id))
+                        corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
+                                                                                        'docId=' + str(
+                                                                                            corrected_item_id))
                         # if we have made it this far then lets go ahead and replace the hyperlink
                         value = value.replace(hyperlink_string, corrected_hyperlink_string)
                     else:
@@ -295,19 +303,19 @@ if __name__ == '__main__':
                                 corrected_item_name))
 
                 # do we have a corrected item id? lets correct the link wiht that data!
-                if corrected_item_id is not None:
-                    # replace the project id
-                    if '?projectId=' in value:
-                        value = value.replace('?projectId=' + str(linked_project_id),
-                                              '?projectId=' + str(project_id))
-                    elif ';projectId=' in value:
-                        value = value.replace(';projectId=' + str(linked_project_id),
-                                              ';projectId=' + str(project_id))
-                    # replace the document id
-                    if '?docId=' in value:
-                        value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
-                    elif ';docId=' in value:
-                        value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
+                # if corrected_item_id is not None:
+                #     # replace the project id
+                #     if '?projectId=' in value:
+                #         value = value.replace('?projectId=' + str(linked_project_id),
+                #                               '?projectId=' + str(project_id))
+                #     elif ';projectId=' in value:
+                #         value = value.replace(';projectId=' + str(linked_project_id),
+                #                               ';projectId=' + str(project_id))
+                #     # replace the document id
+                #     if '?docId=' in value:
+                #         value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
+                #     elif ';docId=' in value:
+                #         value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
 
             # we have a bad link for this item?
             if bad_link_found:
