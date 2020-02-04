@@ -231,7 +231,8 @@ if __name__ == '__main__':
             bad_link_count = 0
 
             if len(hyperlinks) > 0:
-                logger.info('\nProcessing ' + str(len(hyperlinks)) + ' hyperlinks on item ID:[' + str(item_id) + '] on field name:[' + str(key) + ']')
+                logger.info('\nProcessing ' + str(len(hyperlinks)) + ' hyperlinks on item ID:[' + str(
+                    item_id) + '] on field name:[' + str(key) + ']')
 
             counter = 0
 
@@ -248,7 +249,8 @@ if __name__ == '__main__':
                 linked_project_id = urlparse.parse_qs(parsed_link.query)['projectId'][0]
                 linked_item_id = urlparse.parse_qs(parsed_link.query)['docId'][0]
 
-                logger.info('--- link ' + str(counter) + ' --- Processing link with item ID:[' + str(linked_item_id) + '] and project ID:[' + str(linked_project_id) + ']...')
+                logger.info('--- link ' + str(counter) + ' --- Processing link with item ID:[' + str(
+                    linked_item_id) + '] and project ID:[' + str(linked_project_id) + ']...')
 
                 try:
                     original_item = client.get_item(item_id)
@@ -273,7 +275,8 @@ if __name__ == '__main__':
                 # if so then this is a bad link
                 # there could potentially be more than one bad link per field value. so
                 # lets keep track of that.
-                logger.info('Identified correct link, will change to now point to item ID:[' + str(corrected_item_id) + ']')
+                logger.info(
+                    'Identified correct link, will change to now point to item ID:[' + str(corrected_item_id) + ']')
 
                 bad_link_found = True
                 bad_link_count += 1
@@ -283,39 +286,18 @@ if __name__ == '__main__':
 
                 # lets do the work to change the links name to match the new correct item name
                 if corrected_item_name is not None:
-                    hyperlink_old_name = hyperlink.text
                     hyperlink_string = str(hyperlink)
-                    # only proceed with the name swap if we can get an exact match here
-                    if hyperlink_string.endswith(hyperlink_old_name + '</a>'):
-                        corrected_hyperlink_string = hyperlink_string.replace(hyperlink_old_name + '</a>',
-                                                                              corrected_item_name + '</a>')
-                        corrected_hyperlink_string = corrected_hyperlink_string.replace(
-                            'projectId=' + str(linked_project_id),
-                            'projectId=' + str(project_id))
-                        corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
-                                                                                        'docId=' + str(
-                                                                                            corrected_item_id))
-                        # if we have made it this far then lets go ahead and replace the hyperlink
-                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
-                    else:
-                        logger.error(
-                            'unable to correct hyperlink name from ' + str(hyperlink_old_name) + ' -> ' + str(
-                                corrected_item_name))
+                    corrected_hyperlink_string = hyperlink_string[
+                                                 0:hyperlink_string.index('>') + 1] + corrected_item_name + '</a>'
 
-                # do we have a corrected item id? lets correct the link wiht that data!
-                # if corrected_item_id is not None:
-                #     # replace the project id
-                #     if '?projectId=' in value:
-                #         value = value.replace('?projectId=' + str(linked_project_id),
-                #                               '?projectId=' + str(project_id))
-                #     elif ';projectId=' in value:
-                #         value = value.replace(';projectId=' + str(linked_project_id),
-                #                               ';projectId=' + str(project_id))
-                #     # replace the document id
-                #     if '?docId=' in value:
-                #         value = value.replace('?docId=' + str(linked_item_id), '?docId=' + str(corrected_item_id))
-                #     elif ';docId=' in value:
-                #         value = value.replace(';docId=' + str(linked_item_id), ';docId=' + str(corrected_item_id))
+                    corrected_hyperlink_string = corrected_hyperlink_string.replace(
+                        'projectId=' + str(linked_project_id),
+                        'projectId=' + str(project_id))
+                    corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
+                                                                                    'docId=' + str(
+                                                                                        corrected_item_id))
+                    # if we have made it this far then lets go ahead and replace the hyperlink
+                    value = value.replace(hyperlink_string, corrected_hyperlink_string)
 
             # we have a bad link for this item?
             if bad_link_found:
@@ -376,7 +358,7 @@ if __name__ == '__main__':
 
                 bar.next()
             bar.finish()
-            print('fixed ' + str(len(broken_link_map)) + ' attachments')
+            print('fixed ' + str(len(broken_link_map)) + ' broken link(s)')
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
