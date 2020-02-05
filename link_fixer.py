@@ -7,6 +7,7 @@ import sys
 import time
 import warnings
 import urllib.parse as urlparse
+import re
 
 from bs4 import BeautifulSoup
 from halo import Halo
@@ -297,7 +298,25 @@ if __name__ == '__main__':
                                                                                     'docId=' + str(
                                                                                         corrected_item_id))
                     # if we have made it this far then lets go ahead and replace the hyperlink
-                    value = value.replace(hyperlink_string, corrected_hyperlink_string)
+                    if hyperlink_string in value:
+                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
+                    # otherwise we have a character encoding problem here.
+                    else:
+                        start_link = hyperlink_string[0:hyperlink_string.index('>') + 1]
+                        end_link = '</a>'
+
+                        start_index = value.index(start_link) + len(start_link)
+                        end_index = 0
+
+                        # iterate over the string until we encounter a "<" to get the end_index
+                        for i in range(start_index, len(value)):
+                            if value[i] == '<':
+                                end_index = i
+                                break
+
+                        encoded_name = value[start_index:end_index]
+                        hyperlink_string = start_link + encoded_name + end_link
+                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
 
             # we have a bad link for this item?
             if bad_link_found:
