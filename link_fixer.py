@@ -237,6 +237,9 @@ if __name__ == '__main__':
 
             counter = 0
 
+            # remove any duplicate entries in this list.
+            hyperlinks = list(dict.fromkeys(hyperlinks))
+
             # iterate over all the hyperlinks
             for hyperlink in hyperlinks:
                 counter += 1
