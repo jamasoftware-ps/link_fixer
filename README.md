@@ -12,7 +12,9 @@ Fixes broken links in rich text description fields. These broken links are creat
 
 ## Installing dependencies 
  * Download and unzip the package contents into a clean directory.
- * execute `pipenv install` from the commandline.
+ * Do one of the following:
+     * execute `pipenv install` from the commandline.
+     * execute `pip install requirements.txt` from the command line.
  
 ## Usage
 #### Config:
@@ -33,5 +35,5 @@ Fixes broken links in rich text description fields. These broken links are creat
 #### Execution:
  * Open the terminal to the directory the script is in and execute the following:   
  ``` 
- pipenv run python relationship_remover.py
+ pipenv run python link_fixer.py
  ```
