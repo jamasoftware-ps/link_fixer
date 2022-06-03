@@ -7,7 +7,6 @@ import sys
 import time
 import warnings
 import urllib.parse as urlparse
-import re
 
 from bs4 import BeautifulSoup
 from halo import Halo
@@ -26,11 +25,12 @@ def init_jama_client():
         oauth = get_oauth(credentials_dict)
         username = get_username(credentials_dict)
         password = get_password(credentials_dict)
-        jama_client = JamaClient(instance_url, credentials=(username, password), oauth=oauth)
+        disable_ssl = get_disable_ssl(credentials_dict)
+        jama_client = JamaClient(instance_url, credentials=(username, password), oauth=oauth, verify=not disable_ssl)
         jama_client.get_available_endpoints()
         return jama_client
     except APIException:
-        # we cant do things without the API so lets kick out of the execution.
+        # we cant do things without the API so let's kick out of the execution.
         print('Error: invalid Jama credentials, check they are valid in the config.ini file.')
     except:
         print('Failed to authenticate to <' + get_instance_url(credentials_dict) + '>')
@@ -48,7 +48,7 @@ def get_instance_url(credentials_object):
     if 'instance url' in credentials_object:
         instance_url = str(credentials_object['instance url'])
         instance_url = instance_url.lower()
-        # ends with a slash? lets remove this
+        # ends with a slash? let's remove this
         if instance_url.endswith('/'):
             instance_url = instance_url[:-1]
         # user forget to put the "https://" bit?
@@ -88,7 +88,7 @@ def get_password(credentials_object):
 
 def get_oauth(credentials_object):
     if 'using oauth' in credentials_object:
-        # this is user input here so lets be extra careful
+        # this is user input here so let's be extra careful
         user_input = credentials_object['using oauth'].lower()
         user_input = user_input.strip()
         return user_input == 'true' or user_input == 'yes' or user_input == 'y'
@@ -98,11 +98,54 @@ def get_oauth(credentials_object):
         return get_oauth(credentials_object)
 
 
+def get_disable_ssl(credentials_object):
+    # this is an optional param so if not specified then return false
+    if 'disable ssl' in credentials_object:
+        # this is user input here so let's be extra careful
+        user_input = credentials_object['disable ssl'].lower()
+        user_input = user_input.strip()
+        return user_input == 'true' or user_input == 'yes' or user_input == 'y'
+    else:
+        return False
+
+
+def get_link_mode():
+    # this field is required
+    try:
+        user_input = config['PARAMETERS']['link mode'].lower()
+        user_input = user_input.strip()
+        return user_input == 'true' or user_input == 'yes' or user_input == 'y'
+    except:
+        logger.error("missing 'link mode' parameter... please provide a project id in the config ini")
+        sys.exit()
+
+
+def get_text_mode():
+    # this field is required
+    try:
+        user_input = config['PARAMETERS']['text mode'].lower()
+        user_input = user_input.strip()
+        return user_input == 'true' or user_input == 'yes' or user_input == 'y'
+    except:
+        logger.error("missing 'text mode' parameter... please provide a project id in the config ini")
+        sys.exit()
+
+
+def get_display_attribute():
+    # this parameter is optional, defaults to documentKey if not specified
+    try:
+        user_input = config['PARAMETERS']['display attribute']
+        return user_input.strip()
+    except:
+        logger.warning("missing 'display attribute' parameter. using default parmater")
+        return 'documentKey'
+
+
 def get_project_id():
     try:
         return int(config['PARAMETERS']['project id'])
     except:
-        print("missing project id... please provide a project id in the config ini")
+        logger.error("missing project id... please provide a project id in the config ini")
         sys.exit()
 
 
@@ -125,10 +168,10 @@ def init_logger():
     return logger
 
 
-def get_item_name(item_id):
+def get_item_field(item_id, field_key):
     try:
         item = client.get_item(item_id)
-        return item['fields']['documentKey']
+        return item['fields'][field_key]
     except APIException as e:
         if e.reason is None:
             logger.error('Unable to retrieve name data on item [' + item_id + ']  with exception:' + str(e.reason))
@@ -145,7 +188,7 @@ def get_synced_item(item_id, project_id):
         logger.error('Unable to retrieve synced items for item id:[' + str(item_id) + ']. Exception: ' + str(e))
         return None
 
-    if synced_items is None or len(synced_items) is 0:
+    if synced_items is None or len(synced_items) == 0:
         logger.error('Unable to find any synced items for original item with ID:[' + item_id + ']')
         return None
 
@@ -156,7 +199,7 @@ def get_synced_item(item_id, project_id):
             valid_synced_items.append(synced_item['id'])
 
     # only should have one valid synced item here
-    if len(valid_synced_items) is 1:
+    if len(valid_synced_items) == 1:
         return valid_synced_items[0]
     elif len(valid_synced_items) > 1:
         logger.error('Multiple synced items found item with ID:[' + item_id + ']')
@@ -178,6 +221,11 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('config.ini')
     logger.info('Reading in configuration file')
+
+    # make sure we have a mode specified to run on
+    if not get_link_mode() and not get_text_mode():
+        logger.info('no modes are selected, exiting')
+        sys.exit()
 
     client = init_jama_client()
     instance_url = get_instance_url(config['CREDENTIALS'])
@@ -204,7 +252,7 @@ if __name__ == '__main__':
     """
     STEP ONE - get all items from project    
     """
-    # lets validate the project id here before continuing
+    # let's validate the project id here before continuing
     if project_id not in valid_project_ids:
         logger.error('Invalid project id provided in the config.ini')
         sys.exit()
@@ -246,7 +294,7 @@ if __name__ == '__main__':
                 href = hyperlink.get('href')
                 parsed_link = urlparse.urlparse(href)
 
-                # we only want to process jama links. lets skip over all the other links
+                # we only want to process jama links. let's skip over all the other links
                 if parsed_link.hostname is None or parsed_link.hostname not in instance_url:
                     continue
 
@@ -261,7 +309,7 @@ if __name__ == '__main__':
                 except APIException as e:
                     logger.error('Unable to get original data on item ID:[' + str(item_id) + ']. Exception: ' + str(e))
 
-                # lets see if there is a synced item for this link
+                # let's see if there is a synced item for this link
                 corrected_item_id = get_synced_item(linked_item_id, project_id)
 
                 if int(linked_project_id) == int(project_id) and original_item is not None:
@@ -278,29 +326,42 @@ if __name__ == '__main__':
                 # also does this project id param not match the current project?
                 # if so then this is a bad link
                 # there could potentially be more than one bad link per field value. so
-                # lets keep track of that.
+                # let's keep track of that.
                 logger.info(
                     'Identified correct link, will change to now point to item ID:[' + str(corrected_item_id) + ']')
 
                 bad_link_found = True
                 bad_link_count += 1
 
-                # grab the correct item name, we will need this get the new name
-                corrected_item_name = get_item_name(corrected_item_id)
+                hyperlink_string = str(hyperlink)
 
-                # lets do the work to change the links name to match the new correct item name
-                if corrected_item_name is not None:
-                    hyperlink_string = str(hyperlink)
+                # is text mode enabled? if so then update the link name here
+                corrected_item_name = None
+                if get_text_mode():
+                    corrected_item_name = get_item_field(corrected_item_id, get_display_attribute())
+                # otherwise text mode is disabled. so use the existing name here.
+                else:
+                    try:
+                        corrected_item_name = hyperlink_string[
+                                              hyperlink_string.index('>') + 1:hyperlink_string.index('</a>')]
+                    except:
+                        logger.error('failed to resolve link name, this link will not update')
+                        continue
+
+                    # let's do the work to change the links name to match the new correct item name
+
                     corrected_hyperlink_string = hyperlink_string[
                                                  0:hyperlink_string.index('>') + 1] + corrected_item_name + '</a>'
 
-                    corrected_hyperlink_string = corrected_hyperlink_string.replace(
-                        'projectId=' + str(linked_project_id),
-                        'projectId=' + str(project_id))
-                    corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
-                                                                                    'docId=' + str(
-                                                                                        corrected_item_id))
-                    # if we have made it this far then lets go ahead and replace the hyperlink
+                    #  is link mode enabled?
+                    if get_link_mode():
+                        corrected_hyperlink_string = corrected_hyperlink_string.replace(
+                            'projectId=' + str(linked_project_id),
+                            'projectId=' + str(project_id))
+                        corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
+                                                                                        'docId=' + str(
+                                                                                            corrected_item_id))
+                    # if we have made it this far then let's go ahead and replace the hyperlink
                     if hyperlink_string in value:
                         value = value.replace(hyperlink_string, corrected_hyperlink_string)
                     # otherwise we have a character encoding problem here.
@@ -323,7 +384,7 @@ if __name__ == '__main__':
 
             # we have a bad link for this item?
             if bad_link_found:
-                # lets build out an object of all the data we car about for patching and logging
+                # let's build out an object of all the data we car about for patching and logging
                 broken_link_data = {
                     'fieldName': key,
                     'newValue': value,
@@ -368,7 +429,7 @@ if __name__ == '__main__':
                     }
                     patch_list.append(payload)
 
-                # lets try and patch this data
+                # let's try and patch this data
                 try:
                     client.patch_item(item_id, patch_list)
                     logger.info('Successfully patched item [' + str(item_id) + ']')
