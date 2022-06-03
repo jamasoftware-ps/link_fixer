@@ -26,9 +26,13 @@ Fixes broken links in rich text description fields. These broken links are creat
    * `username`: The username or client id of the user
    * `password`: The password or client secret of the user
    Jama connect via OAuth
+   * `disable ssl`: Set to True or False. Setting this to true will ignore SSL verifications 
 
 
- * Import Settings:  These Settings inform the script how the data should be imported to Jama.
+ * Script Parameters:  These Settings inform the script how the data should be imported to Jama.
+   * `link mode`: this is the default mode used to update the link to correct to the corrected item
+   * `text mode`: This mode is used flag if the to set the link display text should be updated
+     * `display attribute`: This optional field will only be used if the text mode is enabled. This field can be used to specify which item type field will be used for the link text (e.g. `name`, `documentKey`, `globalId`, etc). This will default to `documentKey`
    * `project id`: This is a required field, specify the API ID of the project for this script to run against.
 
 
