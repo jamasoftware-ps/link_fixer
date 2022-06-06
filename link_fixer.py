@@ -293,6 +293,7 @@ if __name__ == '__main__':
                 counter += 1
                 href = hyperlink.get('href')
                 parsed_link = urlparse.urlparse(href)
+                hyperlink_string = str(hyperlink)
 
                 # we only want to process jama links. let's skip over all the other links
                 if parsed_link.hostname is None or parsed_link.hostname not in instance_url:
@@ -324,8 +325,23 @@ if __name__ == '__main__':
                 corrected_item_id = get_synced_item(linked_item_id, project_id)
 
                 if int(linked_project_id) == int(project_id) and original_item is not None:
-                    logger.info("valid link detected. skipping.")
-                    continue
+                    # we have a valid link here, but do we have a mismatched name?
+
+                    # are we running text mode? if so were updating the name
+                    if get_text_mode():
+                        sourceName = hyperlink_string[hyperlink_string.index('>') + 1:hyperlink_string.index('</a>')]
+                        targetName = get_item_field(original_item['id'], get_display_attribute())
+
+                        if sourceName == targetName:
+                            logger.info("valid link detected. skipping.")
+                            continue
+
+                        corrected_item_id = original_item['id']
+
+                    # otherwise we already have a valid link, quit
+                    else:
+                        logger.info("valid link detected. skipping.")
+                        continue
                 elif original_item is None or original_item is {}:
                     logger.error('Unable to find original item ID:[' + item_id + ']')
                     continue
@@ -339,12 +355,10 @@ if __name__ == '__main__':
                 # there could potentially be more than one bad link per field value. so
                 # let's keep track of that.
                 logger.info(
-                    'Identified correct link, will change to now point to item ID:[' + str(corrected_item_id) + ']')
+                    'Identified incorrect link, will update... item ID:[' + str(corrected_item_id) + ']')
 
                 bad_link_found = True
                 bad_link_count += 1
-
-                hyperlink_string = str(hyperlink)
 
                 # is text mode enabled? if so then update the link name here
                 corrected_item_name = None
@@ -369,10 +383,9 @@ if __name__ == '__main__':
                     corrected_hyperlink_string = corrected_hyperlink_string.replace(
                         'projectId=' + str(linked_project_id),
                         'projectId=' + str(project_id))
-                    corrected_hyperlink_string = corrected_hyperlink_string.replace(
-                        'docId=' + str(linked_item_id),
-                        'docId=' + str(corrected_item_id))
-
+                    corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
+                                                                                    'docId=' + str(
+                                                                                        corrected_item_id))
                 # if we have made it this far then let's go ahead and replace the hyperlink
                 if hyperlink_string in value:
                     value = value.replace(hyperlink_string, corrected_hyperlink_string)
@@ -413,7 +426,7 @@ if __name__ == '__main__':
     """
     STEP THREE - fix and log all broken hyperlinks
     """
-    # use a progress bar here. this can be a very long running process
+    # use a progress bar here. this can be a very long-running process
     if len(broken_link_map) > 0:
         with ChargingBar('Correcting broken links ', max=len(broken_link_map),
                          suffix='%(percent).1f%% - %(eta)ds') as bar:
@@ -431,8 +444,6 @@ if __name__ == '__main__':
                     logger_new_value = b.get('newValue').replace('\n', '\n\t')
                     logger.info(
                         'Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
-                    logger.info('old rich text:\n\t' + logger_old_value)
-                    logger.info('new rich text:\n\t' + logger_new_value)
 
                     payload = {
                         'op': 'replace',
