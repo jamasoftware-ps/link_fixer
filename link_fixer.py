@@ -195,7 +195,7 @@ def get_synced_item(item_id, project_id):
     valid_synced_items = []
 
     for synced_item in synced_items:
-        if synced_item['project'] is project_id:
+        if synced_item['project'] == project_id:
             valid_synced_items.append(synced_item['id'])
 
     # only should have one valid synced item here
@@ -298,8 +298,19 @@ if __name__ == '__main__':
                 if parsed_link.hostname is None or parsed_link.hostname not in instance_url:
                     continue
 
-                linked_project_id = urlparse.parse_qs(parsed_link.query)['projectId'][0]
-                linked_item_id = urlparse.parse_qs(parsed_link.query)['docId'][0]
+                url_parameters = urlparse.parse_qs(parsed_link.query)
+                linked_project_id = None
+                linked_item_id = None
+                # do we have paramaters from the url? new url formatting from jama that we need to cover
+                if not url_parameters:
+                    # e.g fragment... /items/10140?projectId=77'
+                    link_fragment = parsed_link.fragment
+                    linked_project_id = link_fragment.split('projectId=')[1]
+                    linked_item_id = link_fragment.split('?')[0].split('items/')[1]
+                # otherwise just use the url parameters
+                else:
+                    linked_project_id = url_parameters['projectId'][0]
+                    linked_item_id = url_parameters['docId'][0]
 
                 logger.info('--- link ' + str(counter) + ' --- Processing link with item ID:[' + str(
                     linked_item_id) + '] and project ID:[' + str(linked_project_id) + ']...')
@@ -350,37 +361,38 @@ if __name__ == '__main__':
 
                     # let's do the work to change the links name to match the new correct item name
 
-                    corrected_hyperlink_string = hyperlink_string[
-                                                 0:hyperlink_string.index('>') + 1] + corrected_item_name + '</a>'
+                corrected_hyperlink_string = hyperlink_string[
+                                             0:hyperlink_string.index('>') + 1] + corrected_item_name + '</a>'
 
-                    #  is link mode enabled?
-                    if get_link_mode():
-                        corrected_hyperlink_string = corrected_hyperlink_string.replace(
-                            'projectId=' + str(linked_project_id),
-                            'projectId=' + str(project_id))
-                        corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
-                                                                                        'docId=' + str(
-                                                                                            corrected_item_id))
-                    # if we have made it this far then let's go ahead and replace the hyperlink
-                    if hyperlink_string in value:
-                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
-                    # otherwise we have a character encoding problem here.
-                    else:
-                        start_link = hyperlink_string[0:hyperlink_string.index('>') + 1]
-                        end_link = '</a>'
+                #  is link mode enabled?
+                if get_link_mode():
+                    corrected_hyperlink_string = corrected_hyperlink_string.replace(
+                        'projectId=' + str(linked_project_id),
+                        'projectId=' + str(project_id))
+                    corrected_hyperlink_string = corrected_hyperlink_string.replace(
+                        'docId=' + str(linked_item_id),
+                        'docId=' + str(corrected_item_id))
 
-                        start_index = value.index(start_link) + len(start_link)
-                        end_index = 0
+                # if we have made it this far then let's go ahead and replace the hyperlink
+                if hyperlink_string in value:
+                    value = value.replace(hyperlink_string, corrected_hyperlink_string)
+                # otherwise we have a character encoding problem here.
+                else:
+                    start_link = hyperlink_string[0:hyperlink_string.index('>') + 1]
+                    end_link = '</a>'
 
-                        # iterate over the string until we encounter a "<" to get the end_index
-                        for i in range(start_index, len(value)):
-                            if value[i] == '<':
-                                end_index = i
-                                break
+                    start_index = value.index(start_link) + len(start_link)
+                    end_index = 0
 
-                        encoded_name = value[start_index:end_index]
-                        hyperlink_string = start_link + encoded_name + end_link
-                        value = value.replace(hyperlink_string, corrected_hyperlink_string)
+                    # iterate over the string until we encounter a "<" to get the end_index
+                    for i in range(start_index, len(value)):
+                        if value[i] == '<':
+                            end_index = i
+                            break
+
+                    encoded_name = value[start_index:end_index]
+                    hyperlink_string = start_link + encoded_name + end_link
+                    value = value.replace(hyperlink_string, corrected_hyperlink_string)
 
             # we have a bad link for this item?
             if bad_link_found:
