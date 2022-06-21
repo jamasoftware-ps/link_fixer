@@ -339,16 +339,22 @@ if __name__ == '__main__':
                 if int(linked_project_id) == int(project_id) and original_item is not None:
                     # we have a valid link here, but do we have a mismatched name?
 
+                    try:
+                        target_item = client.get_item(linked_item_id)
+                        corrected_item_id = target_item['id']
+                    except APIException as e:
+                        logger.error(
+                            'Unable to get target item data on item ID:[' + str(
+                                linked_item_id) + ']. Exception: ' + str(e))
+
                     # are we running text mode? if so were updating the name
                     if get_text_mode():
                         sourceName = hyperlink_string[hyperlink_string.index('>') + 1:hyperlink_string.index('</a>')]
-                        targetName = get_item_field(original_item['id'], get_display_attribute())
+                        targetName = get_item_field(target_item['id'], get_display_attribute())
 
                         if sourceName == targetName:
                             logger.info("valid link detected. skipping.")
                             continue
-
-                        corrected_item_id = original_item['id']
 
                     # otherwise we already have a valid link, quit
                     else:
