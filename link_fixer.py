@@ -304,14 +304,26 @@ if __name__ == '__main__':
                 linked_item_id = None
                 # do we have paramaters from the url? new url formatting from jama that we need to cover
                 if not url_parameters:
-                    # e.g fragment... /items/10140?projectId=77'
-                    link_fragment = parsed_link.fragment
-                    linked_project_id = link_fragment.split('projectId=')[1]
-                    linked_item_id = link_fragment.split('?')[0].split('items/')[1]
-                # otherwise just use the url parameters
+                    try:
+                        # e.g fragment... /items/10140?projectId=77'
+                        link_fragment = parsed_link.fragment
+                        linked_project_id = link_fragment.split('projectId=')[1]
+                        linked_item_id = link_fragment.split('?')[0].split('items/')[1]
+                    except Exception as e:
+                        logger.error('failed to get url parameters, error:', e)
+                        logger.error('unable to identify project and item ids from link <' +
+                                     href + '> skipping current link...')
+                        continue
+                # otherwise assume that this url will have proper params we can access
                 else:
-                    linked_project_id = url_parameters['projectId'][0]
-                    linked_item_id = url_parameters['docId'][0]
+                    try:
+                        linked_project_id = url_parameters['projectId'][0]
+                        linked_item_id = url_parameters['docId'][0]
+                    except Exception as e:
+                        logger.error('failed to get url parameters, error:', e)
+                        logger.error('unable to identify project and item ids from link <' +
+                                     href + '> skipping current link...')
+                        continue
 
                 logger.info('--- link ' + str(counter) + ' --- Processing link with item ID:[' + str(
                     linked_item_id) + '] and project ID:[' + str(linked_project_id) + ']...')
