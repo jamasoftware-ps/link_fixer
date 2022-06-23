@@ -4,17 +4,15 @@ Fixes broken links in rich text description fields. These broken links are creat
 
 
 #### Supported features:
-* identifies bad llinks (links pointing to projects that do not exist) and attempts to fix the broken link
+* identifies bad links (links pointing to projects that do not exist) and attempts to fix the broken link
 
 # Requirements
 * [python 3.7+](https://www.python.org/downloads/)
-* [Pipenv](https://docs.pipenv.org/en/latest/) 
+* [pip](https://pip.pypa.io/en/stable/cli/pip_install/)
 
-## Installing dependencies 
- * Download and unzip the package contents into a clean directory.
- * Do one of the following:
-     * execute `pipenv install` from the commandline.
-     * execute `pip install requirements.txt` from the command line.
+## Installing project and dependencies 
+ * Clone the repo `git clone https://github.com/jamasoftware-ps/link_fixer.git`
+ * Install the dependencies  `pip install requirements.txt`
  
 ## Usage
 #### Config:

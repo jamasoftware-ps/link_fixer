@@ -227,6 +227,11 @@ if __name__ == '__main__':
         logger.info('no modes are selected, exiting')
         sys.exit()
 
+    if get_link_mode():
+        logger.info('running link mode')
+    if get_text_mode():
+        logger.info('running text mode')
+
     client = init_jama_client()
     instance_url = get_instance_url(config['CREDENTIALS'])
     logger.info('Successfully connected to instance: <' + instance_url + '>')
@@ -446,7 +451,7 @@ if __name__ == '__main__':
     """
     # use a progress bar here. this can be a very long-running process
     if len(broken_link_map) > 0:
-        with ChargingBar('Correcting broken links ', max=len(broken_link_map),
+        with ChargingBar('Updating links ', max=len(broken_link_map),
                          suffix='%(percent).1f%% - %(eta)ds') as bar:
             # iterate over the map, and do work
             for item_id, broken_links in broken_link_map.items():
@@ -454,14 +459,15 @@ if __name__ == '__main__':
                 patch_list = []
                 changed_list = []
 
-                logger.info('Found broken link(s) on item ID: [' + str(item_id) + ']')
+                logger.info('Updating link(s) on item ID: [' + str(item_id) + ']')
 
                 for b in broken_links:
                     # log out the old and new rich text values.
                     logger_old_value = b.get('oldValue').replace('\n', '\n\t')
                     logger_new_value = b.get('newValue').replace('\n', '\n\t')
                     logger.info(
-                        'Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') + ' broken link(s)')
+                        'Field with name [' + b.get('fieldName') + '] contains ' + b.get('counter') +
+                        ' link(s) to be updated')
 
                     payload = {
                         'op': 'replace',
@@ -482,7 +488,7 @@ if __name__ == '__main__':
 
                 bar.next()
             bar.finish()
-            print('fixed ' + str(len(broken_link_map)) + ' broken link(s)')
+            print('updated ' + str(len(broken_link_map)) + ' link(s)')
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
