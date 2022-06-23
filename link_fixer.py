@@ -387,6 +387,15 @@ if __name__ == '__main__':
                 corrected_item_name = None
                 if get_text_mode():
                     corrected_item_name = get_item_field(corrected_item_id, get_display_attribute())
+                    # are we running only text mode here?
+                    if not get_link_mode():
+                        # dont do any redundant updates
+                        sourceName = hyperlink_string[hyperlink_string.index('>') + 1:hyperlink_string.index('</a>')]
+                        # skip this link if it's already matching here (no work to be done)
+                        if sourceName == corrected_item_name:
+                            bad_link_found = False
+                            continue
+
                 # otherwise text mode is disabled. so use the existing name here.
                 else:
                     try:
