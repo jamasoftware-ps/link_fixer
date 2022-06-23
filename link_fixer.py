@@ -377,8 +377,9 @@ if __name__ == '__main__':
                 # if so then this is a bad link
                 # there could potentially be more than one bad link per field value. so
                 # let's keep track of that.
-                logger.info(
-                    'Identified incorrect link, will update... item ID:[' + str(corrected_item_id) + ']')
+                if get_link_mode():
+                    logger.info(
+                        'Identified incorrect link, will update... item ID:[' + str(corrected_item_id) + ']')
 
                 bad_link_found = True
                 bad_link_count += 1
