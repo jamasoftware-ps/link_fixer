@@ -37,5 +37,5 @@ Fixes broken links in rich text description fields. These broken links are creat
 #### Execution:
  * Open the terminal to the directory the script is in and execute the following:   
  ``` 
- pipenv run python link_fixer.py
+python3 link_fixer.py
  ```
