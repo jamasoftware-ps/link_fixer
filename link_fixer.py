@@ -1,12 +1,14 @@
 import configparser
 import datetime
 import getpass
+import json
 import logging
 import os
 import sys
 import time
 import warnings
 import urllib.parse as urlparse
+import openpyxl
 
 from bs4 import BeautifulSoup
 from halo import Halo
@@ -208,6 +210,27 @@ def get_synced_item(item_id, project_id):
         return None
 
 
+def start_workbook():
+    # Create workbook using openpyxl
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+
+    # Write the headers
+    sheet['A1'] = "Item Name"
+    sheet['B1'] = "Item ID"
+    sheet['C1'] = "Broken Link/Description"
+
+    return workbook
+
+
+def log_locked_items(workbook, item_name, item_id, description):
+    sheet = workbook.active
+    # Check for item lock
+    if client.get_item_lock(item_id):
+        row = [item_name, item_id, description]
+        sheet.append(row)
+
+
 # link fixer script, will identify broken links from old projects, and correct the links
 # a link to the past
 if __name__ == '__main__':
@@ -215,6 +238,8 @@ if __name__ == '__main__':
     # int some logging ish
     logger = init_logger()
     start_time = time.time()
+
+    workbook = start_workbook()  # Opens Excel file to write locked items to
 
     logger.info('Running link fixer script')
 
@@ -272,10 +297,20 @@ if __name__ == '__main__':
     """
     STEP TWO - iterate over all the retrieved items and find bad links   
     """
+
     broken_link_map = {}
     for item in items:
+        item_name = item.get('name')
         item_id = item.get('id')
         fields = item.get('fields')
+        name_field_for_excel = item['fields']['name']
+        link_in_description = item['fields']['description']
+
+        # Getting lock properties, so we don't need to call the API multiple times for Excel logging
+        item_lock_properties = (item.get('lock'))
+        item_lock_json = json.dumps(item_lock_properties)
+        item_lock_dict = json.loads(item_lock_json)
+
         for key in fields:
             original_value = fields[key]
             value = fields[key]
@@ -419,6 +454,11 @@ if __name__ == '__main__':
                     corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
                                                                                     'docId=' + str(
                                                                                         corrected_item_id))
+                # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
+                if item_lock_dict['locked']:
+                    print("Item was locked and has a broken link.  Logging to Excel File...\n")
+                    log_locked_items(workbook, name_field_for_excel, item_id, link_in_description)
+
                 # if we have made it this far then let's go ahead and replace the hyperlink
                 if hyperlink_string in value:
                     value = value.replace(hyperlink_string, corrected_hyperlink_string)
@@ -442,7 +482,7 @@ if __name__ == '__main__':
 
             # we have a bad link for this item?
             if bad_link_found:
-                # let's build out an object of all the data we car about for patching and logging
+                # let's build out an object of all the data we care about for patching and logging
                 broken_link_data = {
                     'fieldName': key,
                     'newValue': value,
@@ -455,6 +495,8 @@ if __name__ == '__main__':
                 else:
                     broken_list.append(broken_link_data)
                 broken_link_map[item_id] = broken_list
+
+            workbook.save("locked_items.xlsx")
 
     """
     STEP THREE - fix and log all broken hyperlinks
