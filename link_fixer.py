@@ -218,17 +218,19 @@ def start_workbook():
     # Write the headers
     sheet['A1'] = "Item Name"
     sheet['B1'] = "Item ID"
-    sheet['C1'] = "Broken Link/Description"
+    sheet['C1'] = "Field with Broken Link"
+    sheet['D1'] = "Broken Hyperlink"
 
     return workbook
 
 
-def log_locked_items(workbook, item_name, item_id, description):
+def log_locked_items(workbook, item_name, item_id, key, hyperlink):
     sheet = workbook.active
     # Check for item lock
     if client.get_item_lock(item_id):
-        row = [item_name, item_id, description]
+        row = [item_name, item_id, key, hyperlink]
         sheet.append(row)
+        logger.info("Item {} is locked and was added to the Excel workbook.")
 
 
 # link fixer script, will identify broken links from old projects, and correct the links
@@ -297,10 +299,8 @@ if __name__ == '__main__':
     """
     STEP TWO - iterate over all the retrieved items and find bad links   
     """
-
     broken_link_map = {}
     for item in items:
-        item_name = item.get('name')
         item_id = item.get('id')
         fields = item.get('fields')
         name_field_for_excel = item['fields']['name']
@@ -454,10 +454,6 @@ if __name__ == '__main__':
                     corrected_hyperlink_string = corrected_hyperlink_string.replace('docId=' + str(linked_item_id),
                                                                                     'docId=' + str(
                                                                                         corrected_item_id))
-                # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
-                if item_lock_dict['locked']:
-                    print("Item was locked and has a broken link.  Logging to Excel File...\n")
-                    log_locked_items(workbook, name_field_for_excel, item_id, link_in_description)
 
                 # if we have made it this far then let's go ahead and replace the hyperlink
                 if hyperlink_string in value:
@@ -480,23 +476,29 @@ if __name__ == '__main__':
                     hyperlink_string = start_link + encoded_name + end_link
                     value = value.replace(hyperlink_string, corrected_hyperlink_string)
 
-            # we have a bad link for this item?
-            if bad_link_found:
-                # let's build out an object of all the data we care about for patching and logging
-                broken_link_data = {
-                    'fieldName': key,
-                    'newValue': value,
-                    'oldValue': original_value,
-                    'counter': str(bad_link_count)
-                }
-                broken_list = broken_link_map.get(item_id)
-                if broken_list is None:
-                    broken_list = [broken_link_data]
-                else:
-                    broken_list.append(broken_link_data)
-                broken_link_map[item_id] = broken_list
+                # we have a bad link for this item?
+                if bad_link_found:
+                    # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
+                    if item_lock_dict['locked']:
+                        print("Item was locked and has a broken link.  Logging to Excel File...\n")
+                        log_locked_items(workbook, name_field_for_excel, str(item_id), key, str(hyperlink))
 
-            workbook.save("locked_items.xlsx")
+                    # let's build out an object of all the data we care about for patching and logging
+                    else:
+                        broken_link_data = {
+                            'fieldName': key,
+                            'newValue': value,
+                            'oldValue': original_value,
+                            'counter': str(bad_link_count)
+                        }
+                        broken_list = broken_link_map.get(item_id)
+                        if broken_list is None:
+                            broken_list = [broken_link_data]
+                        else:
+                            broken_list.append(broken_link_data)
+                        broken_link_map[item_id] = broken_list
+
+    workbook.save("locked_items.xlsx")
 
     """
     STEP THREE - fix and log all broken hyperlinks
