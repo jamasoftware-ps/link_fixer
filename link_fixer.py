@@ -307,9 +307,9 @@ if __name__ == '__main__':
         link_in_description = item['fields']['description']
 
         # Getting lock properties, so we don't need to call the API multiple times for Excel logging
-        item_lock_properties = (item.get('lock'))
-        item_lock_json = json.dumps(item_lock_properties)
-        item_lock_dict = json.loads(item_lock_json)
+        item_lock_properties = item.get('lock')
+        # item_lock_json = json.dumps(item_lock_properties)
+        # item_lock_dict = json.loads(item_lock_json)
 
         for key in fields:
             original_value = fields[key]
@@ -479,7 +479,7 @@ if __name__ == '__main__':
                 # we have a bad link for this item?
                 if bad_link_found:
                     # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
-                    if item_lock_dict['locked']:
+                    if item_lock_properties['locked']:
                         print("Item was locked and has a broken link.  Logging to Excel File...\n")
                         log_locked_items(workbook, name_field_for_excel, str(item_id), key, str(hyperlink))
 
@@ -489,7 +489,9 @@ if __name__ == '__main__':
                             'fieldName': key,
                             'newValue': value,
                             'oldValue': original_value,
-                            'counter': str(bad_link_count)
+                            'counter': str(bad_link_count),
+                            'name': str(name_field_for_excel),
+                            'itemId': str(item_id)
                         }
                         broken_list = broken_link_map.get(item_id)
                         if broken_list is None:
@@ -497,8 +499,6 @@ if __name__ == '__main__':
                         else:
                             broken_list.append(broken_link_data)
                         broken_link_map[item_id] = broken_list
-
-    workbook.save("locked_items.xlsx")
 
     """
     STEP THREE - fix and log all broken hyperlinks
@@ -533,18 +533,28 @@ if __name__ == '__main__':
                 # let's try and patch this data
                 try:
                     client.patch_item(item_id, patch_list)
-                    logger.info('Successfully patched item [' + str(item_id) + ']')
-
+                    logger.info('Successfully patched item [' + b.get('name') + ']')
                 except APIException as error:
-                    # failed to patch
-                    logger.error('Failed to patched item [' + str(item_id) + ']')
-                    logger.error('API exception response: ' + str(error))
+                    if "locked" in str(error):
+                        try:
+                            log_locked_items(workbook, str(b.get('name')), str(b.get('itemId')), str(b.get('fieldName')),
+                                             str(logger_old_value))
+                            print("Log locked items method successful for " + str(b.get('name')))
+                        except Exception as e:
+                            logger.error('Failed to log locked items for [' + str(b.get('name')) + ']')
+                            logger.error('Error: ' + str(e))
+                    else:
+                        # Failed to patch
+                        logger.error('Failed to patch item [' + str(b.get('name')) + ']')
+                        logger.error('API exception response: ' + str(error))
 
                 bar.next()
             bar.finish()
             print('updated ' + str(len(broken_link_map)) + ' link(s)')
     else:
         logger.info('There are zero links to be corrected, exiting...')
+
+    workbook.save("locked_items.xlsx")
 
     # were done here
     elapsed_time = '%.2f' % (time.time() - start_time)
