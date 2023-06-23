@@ -230,7 +230,7 @@ def log_locked_items(workbook, item_name, item_id, key, hyperlink):
     if client.get_item_lock(item_id):
         row = [item_name, item_id, key, hyperlink]
         sheet.append(row)
-        logger.info("Item {} is locked and was added to the Excel workbook.")
+        logger.info("Item {} is locked and was added to the Excel workbook.".format(item_name))
 
 
 # link fixer script, will identify broken links from old projects, and correct the links
