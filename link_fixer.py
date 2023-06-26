@@ -33,9 +33,9 @@ def init_jama_client():
         return jama_client
     except APIException:
         # we cant do things without the API so let's kick out of the execution.
-        print('Error: invalid Jama credentials, check they are valid in the config.ini file.')
+        logger.info('Error: invalid Jama credentials, check they are valid in the config.ini file.')
     except:
-        print('Failed to authenticate to <' + get_instance_url(credentials_dict) + '>')
+        logger.info('Failed to authenticate to <' + get_instance_url(credentials_dict) + '>')
 
     response = input('\nWould you like to manually enter server credentials?\n')
     response = response.lower()
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     spinner.start()
     items = client.get_items(project_id)
     spinner.stop()
-    print('Retrieving ' + str(len(items)) + ' items from project ID:[' + str(project_id) + ']')
+    logger.info('Retrieving ' + str(len(items)) + ' items from project ID:[' + str(project_id) + ']')
 
     """
     STEP TWO - iterate over all the retrieved items and find bad links   
@@ -480,7 +480,7 @@ if __name__ == '__main__':
                 if bad_link_found:
                     # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
                     if item_lock_properties['locked']:
-                        print("Item was locked and has a broken link.  Logging to Excel File...\n")
+                        logger.info("Item was locked and has a broken link.  Logging to Excel File...\n")
                         log_locked_items(workbook, name_field_for_excel, str(item_id), key, str(hyperlink))
 
                     # let's build out an object of all the data we care about for patching and logging
@@ -539,7 +539,7 @@ if __name__ == '__main__':
                         try:
                             log_locked_items(workbook, str(b.get('name')), str(b.get('itemId')), str(b.get('fieldName')),
                                              str(logger_old_value))
-                            print("Log locked items method successful for " + str(b.get('name')))
+                            logger.info("Log locked items method successful for " + str(b.get('name')))
                         except Exception as e:
                             logger.error('Failed to log locked items for [' + str(b.get('name')) + ']')
                             logger.error('Error: ' + str(e))
@@ -550,7 +550,7 @@ if __name__ == '__main__':
 
                 bar.next()
             bar.finish()
-            print('updated ' + str(len(broken_link_map)) + ' link(s)')
+            logger.info('updated ' + str(len(broken_link_map)) + ' link(s)')
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
@@ -558,4 +558,4 @@ if __name__ == '__main__':
 
     # were done here
     elapsed_time = '%.2f' % (time.time() - start_time)
-    print('total execution time: ' + elapsed_time + ' seconds')
+    logger.info('total execution time: ' + elapsed_time + ' seconds')
