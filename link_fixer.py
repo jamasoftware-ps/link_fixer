@@ -216,19 +216,36 @@ def start_workbook():
     sheet = workbook.active
 
     # Write the headers
-    sheet['A1'] = "Item Name"
-    sheet['B1'] = "Item ID"
-    sheet['C1'] = "Field with Broken Link"
-    sheet['D1'] = "Broken Hyperlink"
+    sheet['A1'] = "Item's Project ID (Document Key)"
+    sheet['B1'] = "Locked By"
+    sheet['C1'] = "URL Link to Item"
 
     return workbook
 
 
-def log_locked_items(workbook, item_name, item_id, key, hyperlink):
-    sheet = workbook.active
+def remove_duplicate_rows(workbook, sheet):
+    rows = []
+    for row in sheet.iter_rows(values_only=True):
+        rows.append(row)
+
+    unique_rows = []
+    duplicate_rows = set()
+    for row in rows:
+        if row in unique_rows:
+            duplicate_rows.add(row)
+        else:
+            unique_rows.append(row)
+
+    sheet.delete_rows(1, sheet.max_row)
+
+    for row in unique_rows:
+        sheet.append(row)
+
+
+def log_locked_items(workbook, sheet, item_name, locked_by, url):
     # Check for item lock
     if client.get_item_lock(item_id):
-        row = [item_name, item_id, key, hyperlink]
+        row = [item_name, locked_by, url]
         sheet.append(row)
         logger.info("Item {} is locked and was added to the Excel workbook.".format(item_name))
 
@@ -242,6 +259,7 @@ if __name__ == '__main__':
     start_time = time.time()
 
     workbook = start_workbook()  # Opens Excel file to write locked items to
+    sheet = workbook.active
 
     logger.info('Running link fixer script')
 
@@ -303,13 +321,19 @@ if __name__ == '__main__':
     for item in items:
         item_id = item.get('id')
         fields = item.get('fields')
-        name_field_for_excel = item['fields']['name']
-        link_in_description = item['fields']['description']
+        item_url = instance_url + "/perspective.req#/items/" + str(item_id) + "?projectId=" + str(project_id)
 
         # Getting lock properties, so we don't need to call the API multiple times for Excel logging
         item_lock_properties = item.get('lock')
-        # item_lock_json = json.dumps(item_lock_properties)
-        # item_lock_dict = json.loads(item_lock_json)
+        item_locked_by = item_lock_properties.get('lockedBy')
+
+        if item_locked_by is None:
+            item_locked_by_fullname = "System"
+        else:
+            locked_by_user = client.get_user(item_locked_by)
+            item_locked_by_firstname = locked_by_user.get("firstName")
+            item_locked_by_lastname = locked_by_user.get("lastName")
+            item_locked_by_fullname = item_locked_by_firstname + " " + item_locked_by_lastname
 
         for key in fields:
             original_value = fields[key]
@@ -481,7 +505,7 @@ if __name__ == '__main__':
                     # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
                     if item_lock_properties['locked']:
                         logger.info("Item was locked and has a broken link.  Logging to Excel File...\n")
-                        log_locked_items(workbook, name_field_for_excel, str(item_id), key, str(hyperlink))
+                        log_locked_items(workbook, sheet, item_id, str(item_locked_by_fullname), str(item_url))
 
                     # let's build out an object of all the data we care about for patching and logging
                     else:
@@ -490,8 +514,9 @@ if __name__ == '__main__':
                             'newValue': value,
                             'oldValue': original_value,
                             'counter': str(bad_link_count),
-                            'name': str(name_field_for_excel),
-                            'itemId': str(item_id)
+                            'itemId': str(item_id),
+                            'itemUrl': str(item_url),
+                            'itemLockedBy': str(item_locked_by_fullname)
                         }
                         broken_list = broken_link_map.get(item_id)
                         if broken_list is None:
@@ -537,15 +562,15 @@ if __name__ == '__main__':
                 except APIException as error:
                     if "locked" in str(error):
                         try:
-                            log_locked_items(workbook, str(b.get('name')), str(b.get('itemId')), str(b.get('fieldName')),
-                                             str(logger_old_value))
-                            logger.info("Log locked items method successful for " + str(b.get('name')))
+                            log_locked_items(workbook, sheet, b.get('itemId'), str(b.get('itemLockedBy')),
+                                             str(b.get('itemUrl')))
+                            logger.info("Log locked items method successful for Item ID: " + str(b.get('itemId')))
                         except Exception as e:
-                            logger.error('Failed to log locked items for [' + str(b.get('name')) + ']')
+                            logger.error('Failed to log locked items for [' + str(b.get('itemId')) + ']')
                             logger.error('Error: ' + str(e))
                     else:
                         # Failed to patch
-                        logger.error('Failed to patch item [' + str(b.get('name')) + ']')
+                        logger.error('Failed to patch item [' + str(b.get('itemId')) + ']')
                         logger.error('API exception response: ' + str(error))
 
                 bar.next()
@@ -554,6 +579,7 @@ if __name__ == '__main__':
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
+    remove_duplicate_rows(workbook, sheet)
     workbook.save("locked_items.xlsx")
 
     # were done here
