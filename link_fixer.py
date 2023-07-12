@@ -1,7 +1,6 @@
 import configparser
 import datetime
 import getpass
-import json
 import logging
 import os
 import sys
@@ -16,6 +15,7 @@ from progress.bar import ChargingBar
 
 from py_jama_rest_client.client import JamaClient, APIException
 
+locked_item_data = dict()
 
 def init_jama_client():
     # do we have credentials in the config?
@@ -223,30 +223,10 @@ def start_workbook():
     return workbook
 
 
-def remove_duplicate_rows(workbook, sheet):
-    rows = []
-    for row in sheet.iter_rows(values_only=True):
-        rows.append(row)
-
-    unique_rows = []
-    duplicate_rows = set()
-    for row in rows:
-        if row in unique_rows:
-            duplicate_rows.add(row)
-        else:
-            unique_rows.append(row)
-
-    sheet.delete_rows(1, sheet.max_row)
-
-    for row in unique_rows:
-        sheet.append(row)
-
-
-def log_locked_items(workbook, sheet, item_name, locked_by, url):
-    # Check for item lock
-    if client.get_item_lock(item_id):
-        row = [item_name, locked_by, url]
-        sheet.append(row)
+def log_locked_items(item_name, locked_by, url):
+    # Check for duplicate rows
+    if item_name not in locked_item_data:
+        locked_item_data[item_name] = [item_name, locked_by, url]
         logger.info("Item {} is locked and was added to the Excel workbook.".format(item_name))
 
 
@@ -257,9 +237,6 @@ if __name__ == '__main__':
     # int some logging ish
     logger = init_logger()
     start_time = time.time()
-
-    workbook = start_workbook()  # Opens Excel file to write locked items to
-    sheet = workbook.active
 
     logger.info('Running link fixer script')
 
@@ -505,7 +482,7 @@ if __name__ == '__main__':
                     # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
                     if item_lock_properties['locked']:
                         logger.info("Item was locked and has a broken link.  Logging to Excel File...\n")
-                        log_locked_items(workbook, sheet, item_id, str(item_locked_by_fullname), str(item_url))
+                        log_locked_items(item_id, str(item_locked_by_fullname), str(item_url))
 
                     # let's build out an object of all the data we care about for patching and logging
                     else:
@@ -562,7 +539,7 @@ if __name__ == '__main__':
                 except APIException as error:
                     if "locked" in str(error):
                         try:
-                            log_locked_items(workbook, sheet, b.get('itemId'), str(b.get('itemLockedBy')),
+                            log_locked_items(b.get('itemId'), str(b.get('itemLockedBy')),
                                              str(b.get('itemUrl')))
                             logger.info("Log locked items method successful for Item ID: " + str(b.get('itemId')))
                         except Exception as e:
@@ -579,7 +556,10 @@ if __name__ == '__main__':
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
-    remove_duplicate_rows(workbook, sheet)
+    workbook = start_workbook()  # Opens Excel file to write locked items to
+    sheet = workbook.active
+    for item in locked_item_data:
+        sheet.append(locked_item_data[item])
     workbook.save("locked_items.xlsx")
 
     # were done here
