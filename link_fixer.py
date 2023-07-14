@@ -535,7 +535,8 @@ if __name__ == '__main__':
                 # let's try and patch this data
                 try:
                     client.patch_item(item_id, patch_list)
-                    logger.info('Successfully patched item [' + b.get('name') + ']')
+                    name = b.get('itemId') if b.get('itemId') is not None else "Unknown Item ID"
+                    logger.info('Successfully patched item [' + str(name) + ']')
                 except APIException as error:
                     if "locked" in str(error):
                         try:
