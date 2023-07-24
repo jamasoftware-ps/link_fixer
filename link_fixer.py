@@ -8,7 +8,6 @@ import time
 import warnings
 import urllib.parse as urlparse
 import openpyxl
-from openpyxl.cell.cell import WriteOnlyCell
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.hyperlink import Hyperlink
@@ -232,16 +231,6 @@ def log_locked_items(item_name, locked_by, url):
     if item_name not in locked_item_data:
         locked_item_data[item_name] = [item_name, locked_by, url]
         logger.info("Item {} is locked and was added to the Excel workbook.".format(item_name))
-
-
-def create_hyperlink(url, display_text):
-    """
-       Create a clickable hyperlink in Excel.
-       :param url: The URL to be linked.
-       :param display_text: The text to display in the cell.
-       :return: A string representing the formula for a hyperlink in Excel.
-       """
-    return f'=HYPERLINK("{url}", "{display_text}")'
 
 
 # link fixer script, will identify broken links from old projects, and correct the links
@@ -558,7 +547,7 @@ if __name__ == '__main__':
                 except APIException as error:
                     if "locked" in str(error):
                         try:
-                            log_locked_items(str(b.get('DocumentKey')), str(b.get('itemLockedBy')),
+                            log_locked_items(str(b.get('documentKey')), str(b.get('itemLockedBy')),
                                              b.get('itemUrl'))
                             logger.info("Log locked items method successful for Item ID: " + str(b.get('itemId')))
                         except Exception as e:
