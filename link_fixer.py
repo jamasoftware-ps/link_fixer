@@ -572,9 +572,7 @@ if __name__ == '__main__':
     hyperlink_font = Font(color="0000FF", underline="single")
     for row in sheet.iter_rows(min_row=2, min_col=column_index, max_col=column_index):
         cell = row[0]
-        hyperlink = Hyperlink(ref=cell.coordinate, target=cell.value)
-        cell.value = cell.value
-        cell._hyperlink = hyperlink
+        cell.hyperlink = cell.value
         cell.font = hyperlink_font
     workbook.save("locked_items.xlsx")
 
