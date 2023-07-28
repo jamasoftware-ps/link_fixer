@@ -8,6 +8,9 @@ import time
 import warnings
 import urllib.parse as urlparse
 import openpyxl
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.hyperlink import Hyperlink
 
 from bs4 import BeautifulSoup
 from halo import Halo
@@ -216,7 +219,7 @@ def start_workbook():
     sheet = workbook.active
 
     # Write the headers
-    sheet['A1'] = "Item's Project ID (Document Key)"
+    sheet['A1'] = "ID"
     sheet['B1'] = "Locked By"
     sheet['C1'] = "URL Link to Item"
 
@@ -237,6 +240,8 @@ if __name__ == '__main__':
     # int some logging ish
     logger = init_logger()
     start_time = time.time()
+    workbook = start_workbook()
+    sheet = workbook.active
 
     logger.info('Running link fixer script')
 
@@ -297,6 +302,7 @@ if __name__ == '__main__':
     broken_link_map = {}
     for item in items:
         item_id = item.get('id')
+        item_document_key = item.get('documentKey')
         fields = item.get('fields')
         item_url = instance_url + "/perspective.req#/items/" + str(item_id) + "?projectId=" + str(project_id)
 
@@ -482,7 +488,7 @@ if __name__ == '__main__':
                     # Before we replace the hyperlink, let's check if it's locked and log it to Excel if so
                     if item_lock_properties['locked']:
                         logger.info("Item was locked and has a broken link.  Logging to Excel File...\n")
-                        log_locked_items(item_id, str(item_locked_by_fullname), str(item_url))
+                        log_locked_items(str(item_document_key), str(item_locked_by_fullname), str(item_url))
 
                     # let's build out an object of all the data we care about for patching and logging
                     else:
@@ -493,7 +499,8 @@ if __name__ == '__main__':
                             'counter': str(bad_link_count),
                             'itemId': str(item_id),
                             'itemUrl': str(item_url),
-                            'itemLockedBy': str(item_locked_by_fullname)
+                            'itemLockedBy': str(item_locked_by_fullname),
+                            'documentKey': str(item_document_key)
                         }
                         broken_list = broken_link_map.get(item_id)
                         if broken_list is None:
@@ -540,8 +547,8 @@ if __name__ == '__main__':
                 except APIException as error:
                     if "locked" in str(error):
                         try:
-                            log_locked_items(b.get('itemId'), str(b.get('itemLockedBy')),
-                                             str(b.get('itemUrl')))
+                            log_locked_items(str(b.get('documentKey')), str(b.get('itemLockedBy')),
+                                             b.get('itemUrl'))
                             logger.info("Log locked items method successful for Item ID: " + str(b.get('itemId')))
                         except Exception as e:
                             logger.error('Failed to log locked items for [' + str(b.get('itemId')) + ']')
@@ -557,10 +564,16 @@ if __name__ == '__main__':
     else:
         logger.info('There are zero links to be corrected, exiting...')
 
-    workbook = start_workbook()  # Opens Excel file to write locked items to
-    sheet = workbook.active
     for item in locked_item_data:
         sheet.append(locked_item_data[item])
+
+    column_letter = 'C'
+    column_index = openpyxl.utils.cell.column_index_from_string(column_letter)
+    hyperlink_font = Font(color="0000FF", underline="single")
+    for row in sheet.iter_rows(min_row=2, min_col=column_index, max_col=column_index):
+        cell = row[0]
+        cell.hyperlink = cell.value
+        cell.font = hyperlink_font
     workbook.save("locked_items.xlsx")
 
     # were done here
