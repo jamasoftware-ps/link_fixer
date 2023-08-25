@@ -398,6 +398,7 @@ if __name__ == '__main__':
                     if get_text_mode():
                         sourceName = hyperlink_string[hyperlink_string.index('>') + 1:hyperlink_string.index('</a>')]
                         targetName = get_item_field(target_item['id'], get_display_attribute())
+                        targetName = targetName.replace('&', '&amp;') #Encode ampersand as $amp; to match sourceName
 
                         if sourceName == targetName:
                             logger.info("valid link detected. skipping.")
